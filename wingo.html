@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Betting Game</title>
+    <style>
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 50px 20px;
+            background-image: linear-gradient(135deg, #2c3e50, #34495e);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 500px;
+            width: 100%;
+            padding: 20px;
+            background: #34495e;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            font-size: 1.2em;
+        }
+
+        h1 {
+            color: #f39c12;
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+
+        .wallet, .timer, .betAmount {
+            font-size: 1.3em;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        #walletBalance, #timer {
+            color: #1abc9c;
+        }
+
+        input[type="number"] {
+            padding: 10px;
+            font-size: 1.2em;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: none;
+            outline: none;
+            width: 60%;
+            background: #34495e;
+            color: white;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        input[type="number"]:focus {
+            background: #34495e;
+        }
+
+        button {
+            padding: 15px;
+            margin: 10px 15px;
+            font-size: 1.2em;
+            cursor: pointer;
+            border-radius: 8px;
+            border: none;
+            background-color: #f39c12;
+            color: white;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #e67e22;
+        }
+
+        .betButtons {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .betButtons button {
+            width: 100px;
+            margin: 0 10px;
+        }
+
+        #result {
+            font-size: 1.5em;
+            margin-top: 20px;
+            color: #ecf0f1;
+        }
+
+        .loading {
+            font-size: 1.2em;
+            color: #f39c12;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Color Betting Game</h1>
+
+        <div class="wallet">
+            💰 Wallet Balance: <span id="walletBalance" class="loading">Loading...</span>
+        </div>
+
+        <div class="timer">
+            ⏳ Time Left: <span id="timer" class="loading">Loading...</span>s
+        </div>
+
+        <div class="betAmount">
+            <label for="betAmount">Enter Bet Amount:</label>
+            <input type="number" id="betAmount" min="1" placeholder="Enter amount" />
+        </div>
+
+        <div class="betButtons">
+            <button id="redButton">Red</button>
+            <button id="blueButton">Blue</button>
+            <button id="greenButton">Green</button>
+        </div>
+
+        <p id="result">Waiting for result...</p>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+        // 🔥 Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAq_XRxEI6E1Cm9BgXXT3FJmHxYOXMOPBM",
+            authDomain: "clcub-90520.firebaseapp.com",
+            projectId: "clcub-90520",
+            storageBucket: "clcub-90520.firebasestorage.app",
+            messagingSenderId: "242875704536",
+            appId: "1:242875704536:web:3bc7eb43184ea821d723ad",
+            measurementId: "G-8V4LMD635Z"
+        };
+
+        // 🔥 Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // 🟢 Load Wallet Balance
+        async function loadWallet() {
+            const userRef = doc(db, "users", "user1");
+            const userSnap = await getDoc(userRef);
+
+            if (userSnap.exists()) {
+                document.getElementById("walletBalance").innerText = `₹${userSnap.data().balance}`;
+            } else {
+                console.log("No such user!");
+            }
+        }
+
+        // 🔴 Real-Time Timer Update from Firebase
+        function startTimerListener() {
+            const timerRef = doc(db, "game", "timer");
+
+            onSnapshot(timerRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    let timeLeft = docSnap.data().timeLeft;
+                    document.getElementById("timer").innerText = timeLeft;
+                } else {
+                    console.log("No timer found!");
+                }
+            });
+        }
+
+        // 🔄 Reset Timer Function (जब Timer 0 हो जाए, इसे Firebase में फिर से 30 पर सेट करें)
+        async function resetTimer() {
+            const timerRef = doc(db, "game", "timer");
+            await updateDoc(timerRef, { timeLeft: 30 });
+            console.log("Timer Reset to 30");
+        }
+
+        // 🔄 Start Timer Countdown (Firestore से लोड और अपडेट होगा)
+        async function runTimer() {
+            let timerRef = doc(db, "game", "timer");
+            let timerSnap = await getDoc(timerRef);
+
+            if (timerSnap.exists()) {
+                let timeLeft = timerSnap.data().timeLeft;
+                const interval = setInterval(async () => {
+                    if (timeLeft > 0) {
+                        timeLeft--;
+                        await updateDoc(timerRef, { timeLeft });
+                    } else {
+                        clearInterval(interval);
+                        resetTimer();
+                    }
+                }, 1000);
+            }
+        }
+
+        // 🟢 Place Bet
+        async function placeBet(color) {
+            let betAmount = document.getElementById("betAmount").value;
+            if (!betAmount || betAmount <= 0) {
+                alert("Please enter a valid bet amount!");
+                return;
+            }
+
+            let userRef = doc(db, "users", "user1");
+            let userSnap = await getDoc(userRef);
+
+            if (userSnap.exists()) {
+                let currentBalance = userSnap.data().balance;
+                if (currentBalance >= betAmount) {
+                    // Decrease balance
+                    await updateDoc(userRef, { balance: currentBalance - betAmount });
+
+                    // Save the bet info in Firestore
+                    const betRef = doc(db, "bets", "bet" + new Date().getTime());
+                    await updateDoc(betRef, {
+                        color: color,
+                        amount: betAmount,
+                        timestamp: new Date().toISOString()
+                    });
+
+                    document.getElementById("walletBalance").innerText = `₹${currentBalance - betAmount}`;
+                    document.getElementById("result").innerText = `You bet ₹${betAmount} on ${color.toUpperCase()}!`;
+                } else {
+                    alert("Insufficient balance!");
+                }
+            }
+        }
+
+        // 🔄 Initialize Data
+        async function init() {
+            document.getElementById("walletBalance").innerText = "Loading...";
+            document.getElementById("timer").innerText = "Loading...";
+
+            await loadWallet();
+            startTimerListener(); // Timer को Real-Time में लोड करने के लिए
+            runTimer(); // Timer को चालू करने के लिए
+
+            // Randomly change button colors
+            randomizeButtonColors();
+        }
+
+        // Function to change button colors randomly
+        function randomizeButtonColors() {
+            const colors = ["red", "blue", "green"];
+            const buttons = [document.getElementById("redButton"), document.getElementById("blueButton"), document.getElementById("greenButton")];
+
+            // Randomly shuffle colors array
+            colors.sort(() => Math.random() - 0.5);
+
+            // Assign random colors to buttons
+            buttons[0].style.backgroundColor = colors[0];
+            buttons[1].style.backgroundColor = colors[1];
+            buttons[2].style.backgroundColor = colors[2];
+        }
+
+        // Attach event listeners for bet buttons
+        document.getElementById("redButton").addEventListener("click", () => placeBet("red"));
+        document.getElementById("blueButton").addEventListener("click", () => placeBet("blue"));
+        document.getElementById("greenButton").addEventListener("click", () => placeBet("green"));
+
+        window.onload = init;
+    </script>
+</body>
+</html>
